@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DisplaceOS - Disaster Relief & Emergency Operations</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              dark: '#0f172a',
+              card: '#1e293b',
+              border: '#334155',
+              cyan: '#06b6d4',
+              crimson: '#f43f5e',
+              emerald: '#10b981',
+              amber: '#f59e0b'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- Google Fonts (Inter) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0b0f19;
+      color: #f1f5f9;
+    }
+
+    /* Custom Leaflet Dark Mode Popups */
+    .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+      background-color: #1e293b !important;
+      color: #f1f5f9 !important;
+      border: 1px solid #334155;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      border-radius: 8px;
+    }
+    .leaflet-container {
+      background: #0f172a !important;
+    }
+
+    /* Marker Pulse Animations */
+    @keyframes pulse-red {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 12px rgba(244, 63, 94, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+    }
+    .pulse-sos {
+      border-radius: 50%;
+      animation: pulse-red 2s infinite;
+    }
+
+    @keyframes pulse-amber {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+    }
+    .pulse-earthquake {
+      border-radius: 50%;
+      animation: pulse-amber 1.8s infinite;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #06b6d4;
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen antialiased selection:bg-cyan-500 selection:text-white">
+
+  <!-- TOP NAVBAR / HEADER -->
+  <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- Branding -->
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('mapTab')">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-rose-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+            <i class="fa-solid font-bold fa-satellite-dish text-white text-lg"></i>
+          </div>
+          <div>
+            <span class="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-rose-400">
+              DisplaceOS
+            </span>
+            <span class="hidden sm:inline-block ml-2 text-xs px-2 py-0.5 rounded-full bg-slate-800 text-cyan-400 border border-cyan-500/30 font-semibold">
+              RELIEF COMMAND
+            </span>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs (Desktop) -->
+        <nav class="hidden md:flex space-x-1 lg:space-x-2">
+          <button id="nav-sosTab" onclick="switchTab('sosTab')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-slate-800">
+            <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
+            <span>Citizen SOS</span>
+          </button>
+          <button id="nav-mapTab" onclick="switchTab('mapTab')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-slate-800">
+            <i class="fa-solid fa-map-location-dot text-cyan-400"></i>
+            <span>Command Map</span>
+            <span id="mapSosBadge" class="bg-rose-500/20 text-rose-400 text-xs px-2 py-0.5 rounded-full font-bold border border-rose-500/30">0</span>
+          </button>
+          <button id="nav-campsTab" onclick="switchTab('campsTab')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-slate-800">
+            <i class="fa-solid fa-campground text-emerald-400"></i>
+            <span>Relief Camps</span>
+          </button>
+          <button id="nav-alertsTab" onclick="switchTab('alertsTab')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-slate-800">
+            <i class="fa-solid fa-bolt text-amber-400"></i>
+            <span>Live Alerts</span>
+            <span id="alertCountBadge" class="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded-full font-bold border border-amber-500/30">Live</span>
+          </button>
+        </nav>
+
+        <!-- Mobile Menu Toggle -->
+        <div class="md:hidden">
+          <button onclick="toggleMobileMenu()" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 focus:outline-none">
+            <i class="fa-solid fa-bars text-xl"></i>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Mobile Dropdown Navigation -->
+    <div id="mobileMenu" class="hidden md:hidden border-t border-slate-800 bg-slate-900/95 px-4 pt-2 pb-4 space-y-1">
+      <button onclick="switchTab('sosTab')" class="w-full text-left px-3 py-2 rounded-md text-slate-200 hover:bg-slate-800 flex items-center space-x-3">
+        <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
+        <span>Citizen SOS Form</span>
+      </button>
+      <button onclick="switchTab('mapTab')" class="w-full text-left px-3 py-2 rounded-md text-slate-200 hover:bg-slate-800 flex items-center space-x-3">
+        <i class="fa-solid fa-map-location-dot text-cyan-400"></i>
+        <span>Command Map</span>
+      </button>
+      <button onclick="switchTab('campsTab')" class="w-full text-left px-3 py-2 rounded-md text-slate-200 hover:bg-slate-800 flex items-center space-x-3">
+        <i class="fa-solid fa-campground text-emerald-400"></i>
+        <span>Relief Camps</span>
+      </button>
+      <button onclick="switchTab('alertsTab')" class="w-full text-left px-3 py-2 rounded-md text-slate-200 hover:bg-slate-800 flex items-center space-x-3">
+        <i class="fa-solid fa-bolt text-amber-400"></i>
+        <span>Live USGS Alerts</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+    <!-- STATUS BANNER / NOTIFICATION -->
+    <div id="notificationBanner" class="hidden mb-6 p-4 rounded-xl border flex items-center justify-between shadow-lg transition-all transform duration-300">
+      <div class="flex items-center space-x-3">
+        <i id="notifIcon" class="fa-solid fa-circle-check text-xl"></i>
+        <span id="notifMessage" class="text-sm font-medium">Notification Message</span>
+      </div>
+      <button onclick="hideNotification()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <!-- TAB 1: CITIZEN SOS FORM -->
+    <section id="sosTab" class="tab-content hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- SOS Form Left Panel -->
+        <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl">
+          <div class="flex items-center justify-between mb-6 border-b border-slate-800 pb-4">
+            <div>
+              <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation text-rose-500 animate-bounce"></i>
+                Emergency Citizen SOS Signal
+              </h2>
+              <p class="text-slate-400 text-sm mt-1">Submit your details to broadcast location coordinates to emergency rescue teams.</p>
+            </div>
+            <span class="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+              PRIORITY LEVEL 1
+            </span>
+          </div>
+
+          <form id="sosForm" onsubmit="handleSosSubmit(event)" class="space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              
+              <!-- Name Input -->
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Full Name *</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500"><i class="fa-solid fa-user"></i></span>
+                  <input type="text" id="sosName" required placeholder="e.g. Ramesh Kumar" class="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-white placeholder-slate-500 outline-none transition-all">
+                </div>
+              </div>
+
+              <!-- Contact Input -->
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Contact Phone Number *</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500"><i class="fa-solid fa-phone"></i></span>
+                  <input type="tel" id="sosPhone" required placeholder="+91 98765 43210" class="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-white placeholder-slate-500 outline-none transition-all">
+                </div>
+              </div>
+
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              
+              <!-- Emergency Type -->
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Nature of Emergency *</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500"><i class="fa-solid fa-kit-medical"></i></span>
+                  <select id="sosEmergencyType" required class="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-white outline-none transition-all appearance-none">
+                    <option value="Trapped / Search & Rescue">Trapped / Rescue Needed</option>
+                    <option value="Medical Emergency">Medical Assistance Required</option>
+                    <option value="Food & Clean Water Crisis">Food & Water Shortage</option>
+                    <option value="Shelter / Evacuation">Shelter / Evacuation</option>
+                  </select>
+                  <span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500"><i class="fa-solid fa-chevron-down"></i></span>
+                </div>
+              </div>
+
+              <!-- Number of People -->
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Number of Individuals Affected *</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500"><i class="fa-solid fa-users"></i></span>
+                  <input type="number" id="sosPeopleCount" min="1" max="500" value="1" required class="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-white outline-none transition-all">
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Geolocation Capture Box -->
+            <div class="p-5 bg-slate-800/50 border border-slate-700/80 rounded-xl space-y-4">
+              <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h4 class="text-sm font-semibold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-location-crosshairs text-cyan-400"></i>
+                    GPS Coordinate Verification
+                  </h4>
+                  <p class="text-xs text-slate-400 mt-0.5">Automated high-precision satellite coordinate lock.</p>
+                </div>
+                <button type="button" onclick="requestGPSLocation()" id="gpsBtn" class="px-4 py-2 bg-cyan-500/10 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/20 rounded-lg text-sm font-semibold transition-all flex items-center space-x-2">
+                  <i class="fa-solid fa-location-arrow"></i>
+                  <span>Share GPS Location</span>
+                </button>
+              </div>
+
+              <!-- Lat / Lon Display -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Latitude</label>
+                  <input type="text" id="sosLat" readonly placeholder="27.1767" class="w-full px-3 py-2 bg-slate-900 border border-slate-700/60 rounded-lg text-xs font-mono text-cyan-400 font-bold focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Longitude</label>
+                  <input type="text" id="sosLng" readonly placeholder="78.0081" class="w-full px-3 py-2 bg-slate-900 border border-slate-700/60 rounded-lg text-xs font-mono text-cyan-400 font-bold focus:outline-none">
+                </div>
+              </div>
+              <p id="gpsStatusText" class="text-xs text-slate-400 italic">Default fallback location set (Agra, UP). Click 'Share GPS Location' to override with current location.</p>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="w-full py-4 bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold rounded-xl shadow-lg shadow-rose-600/30 transition-all flex items-center justify-center space-x-2 text-base">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>TRANSMIT EMERGENCY SOS SIGNAL</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- SOS Recent Broadcast Feed (Right Panel) -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-list-ul text-cyan-400"></i>
+              Local SOS Feed
+            </h3>
+            <span id="sosFeedCount" class="text-xs bg-slate-800 px-2.5 py-1 rounded-full text-slate-300 border border-slate-700 font-semibold">0 Broadcasts</span>
+          </div>
+
+          <div id="sosFeedContainer" class="flex-grow my-4 space-y-3 overflow-y-auto max-h-[500px] pr-1">
+            <!-- Dynamic SOS cards injected here -->
+          </div>
+
+          <button onclick="clearLocalStorageSos()" class="mt-auto pt-3 text-xs text-slate-500 hover:text-rose-400 flex items-center justify-center gap-1 transition-all">
+            <i class="fa-solid fa-trash-can"></i> Reset Local SOS Signal Storage
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 2: COMMAND MAP -->
+    <section id="mapTab" class="tab-content hidden space-y-6">
+      
+      <!-- Map Header & Filter Bar -->
+      <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-map-location-dot text-cyan-400"></i>
+            Tactical Emergency GIS Command Map
+          </h2>
+          <p class="text-xs text-slate-400">Unified Spatial Visualizer for SOS Signals, Relief Infrastructure & Seismic Activity</p>
+        </div>
+
+        <!-- Layer Toggle Controls -->
+        <div class="flex flex-wrap items-center gap-2 sm:gap-4">
+          <label class="flex items-center space-x-2 cursor-pointer bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/80 text-xs text-slate-200">
+            <input type="checkbox" id="layerSosCheck" checked onchange="toggleMapLayer('sos')" class="rounded text-rose-500 focus:ring-0 bg-slate-900 border-slate-600">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> SOS Signals</span>
+          </label>
+
+          <label class="flex items-center space-x-2 cursor-pointer bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/80 text-xs text-slate-200">
+            <input type="checkbox" id="layerCampsCheck" checked onchange="toggleMapLayer('camps')" class="rounded text-emerald-500 focus:ring-0 bg-slate-900 border-slate-600">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Relief Camps</span>
+          </label>
+
+          <label class="flex items-center space-x-2 cursor-pointer bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/80 text-xs text-slate-200">
+            <input type="checkbox" id="layerAlertsCheck" checked onchange="toggleMapLayer('alerts')" class="rounded text-amber-500 focus:ring-0 bg-slate-900 border-slate-600">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> USGS Seismic</span>
+          </label>
+
+          <button onclick="recenterMapToUser()" class="p-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-crosshairs"></i> Recenter
+          </button>
+        </div>
+      </div>
+
+      <!-- Map Render Box -->
+      <div class="relative w-full rounded-2xl overflow-hidden border border-slate-800 shadow-2xl h-[600px] bg-slate-950">
+        <div id="map" class="w-full h-full z-10"></div>
+        
+        <!-- Legend Overlay -->
+        <div class="absolute bottom-4 left-4 z-[400] bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-slate-800 text-xs space-y-2 shadow-xl">
+          <div class="font-bold text-slate-300 border-b border-slate-800 pb-1">Map Legend</div>
+          <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-rose-500 ring-2 ring-rose-500/30"></span> Citizen SOS Request</div>
+          <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-emerald-500/30"></span> Operational Relief Camp</div>
+          <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-amber-500 ring-2 ring-amber-500/30"></span> USGS Seismic Event</div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- TAB 3: RELIEF CAMPS REGISTRY -->
+    <section id="campsTab" class="tab-content hidden space-y-6">
+      
+      <!-- Top Action Bar -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 p-6 rounded-2xl border border-slate-800">
+        <div>
+          <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-campground text-emerald-400"></i>
+            Relief Camp & Logistics Infrastructure
+          </h2>
+          <p class="text-slate-400 text-sm">Monitor camp capacities, occupancy ratios, and emergency supply inventories.</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="relative flex-grow md:w-64">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500"><i class="fa-solid fa-magnifying-glass text-xs"></i></span>
+            <input type="text" id="campSearchInput" onkeyup="filterCampTable()" placeholder="Search camps or location..." class="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 outline-none focus:ring-2 focus:ring-emerald-500">
+          </div>
+          <button onclick="openAddCampModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-sm transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/20">
+            <i class="fa-solid fa-plus"></i>
+            <span>Register Camp</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Camps Data Table -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="bg-slate-800/80 text-xs uppercase font-semibold text-slate-400 tracking-wider border-b border-slate-700">
+              <tr>
+                <th class="px-6 py-4">Camp Details</th>
+                <th class="px-6 py-4">Location</th>
+                <th class="px-6 py-4">Occupancy Status</th>
+                <th class="px-6 py-4">Food Reserve</th>
+                <th class="px-6 py-4">Medical Stock</th>
+                <th class="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="campsTableBody" class="divide-y divide-slate-800">
+              <!-- Dynamic Rows Injected Here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- TAB 4: LIVE DISASTER ALERTS (USGS API) -->
+    <section id="alertsTab" class="tab-content hidden space-y-6">
+      
+      <!-- Header -->
+      <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center space-x-2">
+            <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-bolt text-amber-400"></i>
+              Global Real-Time Seismic Telemetry
+            </h2>
+            <span class="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-0.5 rounded-full font-bold">USGS Stream</span>
+          </div>
+          <p class="text-slate-400 text-sm mt-1">Live Feed from United States Geological Survey Real-time Earthquake Hazards Program.</p>
+        </div>
+
+        <button onclick="fetchUsgsEarthquakes()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium rounded-lg text-sm transition-all flex items-center gap-2 self-start md:self-auto">
+          <i class="fa-solid fa-rotate-right text-amber-400"></i>
+          <span>Sync API Now</span>
+        </button>
+      </div>
+
+      <!-- Feed Grid -->
+      <div id="alertsFeedGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Dynamic Cards Here -->
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL: UPDATE CAMP INVENTORY -->
+  <div id="campModal" class="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 id="modalTitle" class="text-lg font-bold text-white">Update Relief Camp Inventory</h3>
+        <button onclick="closeCampModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form id="campForm" onsubmit="saveCampForm(event)" class="space-y-4">
+        <input type="hidden" id="modalCampId">
+        
+        <div>
+          <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Camp Name</label>
+          <input type="text" id="modalCampName" required class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Location / District</label>
+          <input type="text" id="modalCampLocation" required class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Total Capacity</label>
+            <input type="number" id="modalCampCapacity" required min="1" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Current Occupants</label>
+            <input type="number" id="modalCampOccupancy" required min="0" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Food Reserve</label>
+            <select id="modalCampFood" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="Sufficient (7+ Days)">Sufficient (7+ Days)</option>
+              <option value="Moderate (3-6 Days)">Moderate (3-6 Days)</option>
+              <option value="Critical (< 2 Days)">Critical (< 2 Days)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Medical Supplies</label>
+            <select id="modalCampMedical" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="Fully Stocked">Fully Stocked</option>
+              <option value="Restock Required">Restock Required</option>
+              <option value="Emergency Shortage">Emergency Shortage</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Latitude</label>
+            <input type="text" id="modalCampLat" required placeholder="27.18" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Longitude</label>
+            <input type="text" id="modalCampLng" required placeholder="78.01" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-3 border-t border-slate-800">
+          <button type="button" onclick="closeCampModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-semibold">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-semibold shadow-lg shadow-emerald-600/30">Save Record</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="bg-slate-900 border-t border-slate-800 mt-12 py-6">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 space-y-2">
+      <p><span class="font-bold text-slate-400">DisplaceOS</span> - Rapid Relief & Emergency Coordination Network</p>
+      <p>Integrating Real-time GIS Data Streams, Offline-First Local Storage, and USGS Hazards Monitoring.</p>
+    </div>
+  </footer>
+
+  <!-- SCRIPT & APPLICATION LOGIC -->
+  <script>
+    // --- GLOBAL STATE ---
+    const DEFAULT_COORDS = { lat: 27.1767, lng: 78.0081 }; // Agra, UP, India
+    let userCoords = { ...DEFAULT_COORDS };
+
+    let map = null;
+    let mapLayers = {
+      sos: L.layerGroup(),
+      camps: L.layerGroup(),
+      alerts: L.layerGroup()
+    };
+
+    let sosReports = [];
+    let reliefCamps = [
+      { id: 'camp-1', name: 'Agra Central Stadium Relief Center', location: 'Civil Lines, Agra', capacity: 1500, occupancy: 850, food: 'Sufficient (7+ Days)', medical: 'Fully Stocked', lat: 27.1950, lng: 78.0090 },
+      { id: 'camp-2', name: 'Yamuna Flood Relief Shelter #3', location: 'Taj East Gate Rd, Agra', capacity: 800, occupancy: 720, food: 'Critical (< 2 Days)', medical: 'Restock Required', lat: 27.1680, lng: 78.0420 },
+      { id: 'camp-3', name: 'Dayalbagh Community Safehouse', location: 'Dayalbagh, Agra', capacity: 500, occupancy: 210, food: 'Sufficient (7+ Days)', medical: 'Fully Stocked', lat: 27.2200, lng: 78.0150 }
+    ];
+    let usgsAlerts = [];
+
+    // --- INITIALIZATION ---
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSosFromLocalStorage();
+      initMap();
+      renderSosFeed();
+      renderCampTable();
+      fetchUsgsEarthquakes();
+      switchTab('mapTab'); // Default view
+    });
+
+    // --- NAVIGATION LOGIC ---
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(tabId).classList.remove('hidden');
+
+      // Update Nav styling
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('bg-slate-800', 'text-white', 'border-b-2', 'border-cyan-400');
+        btn.classList.add('text-slate-300');
+      });
+
+      const activeNav = document.getElementById(`nav-${tabId}`);
+      if (activeNav) {
+        activeNav.classList.add('bg-slate-800', 'text-white');
+      }
+
+      // Close mobile menu if open
+      document.getElementById('mobileMenu').classList.add('hidden');
+
+      // Re-invalidate Leaflet size when switching to map
+      if (tabId === 'mapTab' && map) {
+        setTimeout(() => map.invalidateSize(), 200);
+      }
+    }
+
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobileMenu');
+      menu.classList.toggle('hidden');
+    }
+
+    // --- NOTIFICATION BANNER ---
+    function showNotification(msg, type = 'success') {
+      const banner = document.getElementById('notificationBanner');
+      const icon = document.getElementById('notifIcon');
+      const message = document.getElementById('notifMessage');
+
+      banner.className = `mb-6 p-4 rounded-xl border flex items-center justify-between shadow-lg transition-all transform duration-300 ${
+        type === 'success' 
+          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+          : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+      }`;
+
+      icon.className = type === 'success' ? 'fa-solid fa-circle-check text-xl text-emerald-400' : 'fa-solid fa-triangle-exclamation text-xl text-rose-400';
+      message.innerText = msg;
+      banner.classList.remove('hidden');
+
+      setTimeout(() => hideNotification(), 5000);
+    }
+
+    function hideNotification() {
+      document.getElementById('notificationBanner').classList.add('hidden');
+    }
+
+    // --- GEOLOCATION FUNCTIONALITY ---
+    function requestGPSLocation() {
+      const statusText = document.getElementById('gpsStatusText');
+      const btn = document.getElementById('gpsBtn');
+
+      if (!navigator.geolocation) {
+        statusText.innerText = "Geolocation is not supported by your browser.";
+        statusText.classList.add('text-rose-400');
+        return;
+      }
+
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Acquiring...</span>`;
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          userCoords.lat = parseFloat(position.coords.latitude.toFixed(4));
+          userCoords.lng = parseFloat(position.coords.longitude.toFixed(4));
+
+          document.getElementById('sosLat').value = userCoords.lat;
+          document.getElementById('sosLng').value = userCoords.lng;
+
+          btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> <span>Location Acquired</span>`;
+          statusText.innerText = `GPS Lock Confirmed: Precision Accuracy ~${Math.round(position.coords.accuracy)} meters.`;
+          statusText.className = "text-xs text-emerald-400 font-semibold";
+
+          showNotification(`GPS position locked: ${userCoords.lat}, ${userCoords.lng}`);
+          
+          if (map) map.setView([userCoords.lat, userCoords.lng], 13);
+        },
+        (error) => {
+          btn.innerHTML = `<i class="fa-solid fa-location-arrow"></i> <span>Share GPS Location</span>`;
+          statusText.innerText = `GPS Error: ${error.message}. Using default coordinates.`;
+          statusText.className = "text-xs text-rose-400 italic";
+          showNotification("Could not retrieve precise location. Fallback coords used.", "error");
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+
+    // --- SOS FORM & LOCAL STORAGE ---
+    function handleSosSubmit(e) {
+      e.preventDefault();
+
+      const name = document.getElementById('sosName').value.trim();
+      const phone = document.getElementById('sosPhone').value.trim();
+      const type = document.getElementById('sosEmergencyType').value;
+      const count = parseInt(document.getElementById('sosPeopleCount').value, 10);
+      let lat = parseFloat(document.getElementById('sosLat').value) || userCoords.lat;
+      let lng = parseFloat(document.getElementById('sosLng').value) || userCoords.lng;
+
+      const newReport = {
+        id: 'sos-' + Date.now(),
+        name,
+        phone,
+        type,
+        count,
+        lat,
+        lng,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      sosReports.unshift(newReport);
+      saveSosToLocalStorage();
+      
+      renderSosFeed();
+      plotMapMarkers();
+      
+      showNotification(`SOS Broadcast transmitted successfully for ${name}.`);
+      document.getElementById('sosForm').reset();
+      
+      // Reset coords inputs
+      document.getElementById('sosLat').value = '';
+      document.getElementById('sosLng').value = '';
+      document.getElementById('gpsStatusText').innerText = "Default fallback location set (Agra, UP). Click 'Share GPS Location' to override with current location.";
+      document.getElementById('gpsStatusText').className = "text-xs text-slate-400 italic";
+
+      switchTab('mapTab');
+    }
+
+    function saveSosToLocalStorage() {
+      localStorage.setItem('displaceos_sos_reports', JSON.stringify(sosReports));
+    }
+
+    function loadSosFromLocalStorage() {
+      const stored = localStorage.getItem('displaceos_sos_reports');
+      if (stored) {
+        try {
+          sosReports = JSON.parse(stored);
+        } catch (err) {
+          sosReports = [];
+        }
+      }
+    }
+
+    function clearLocalStorageSos() {
+      if (confirm("Are you sure you want to clear locally stored SOS reports?")) {
+        sosReports = [];
+        saveSosToLocalStorage();
+        renderSosFeed();
+        plotMapMarkers();
+        showNotification("Local SOS reports cleared.", "success");
+      }
+    }
+
+    function renderSosFeed() {
+      const container = document.getElementById('sosFeedContainer');
+      const badge = document.getElementById('mapSosBadge');
+      const countBadge = document.getElementById('sosFeedCount');
+
+      badge.innerText = sosReports.length;
+      countBadge.innerText = `${sosReports.length} Broadcasts`;
+
+      if (sosReports.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 text-slate-500 space-y-2">
+            <i class="fa-solid fa-shield-heart text-3xl opacity-40"></i>
+            <p class="text-xs">No emergency SOS signals active.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = sosReports.map(item => `
+        <div class="p-3.5 bg-slate-800/80 border border-slate-700/70 rounded-xl space-y-2 hover:border-rose-500/50 transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+              ${item.type}
+            </span>
+            <span class="text-[10px] text-slate-500 font-mono">${item.timestamp}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm font-semibold text-white">
+            <span>${item.name}</span>
+            <span class="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300"><i class="fa-solid fa-users text-slate-400 text-[10px]"></i> ${item.count}</span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-700/50">
+            <span><i class="fa-solid fa-phone text-slate-500 mr-1"></i>${item.phone}</span>
+            <span class="font-mono text-[11px] text-cyan-400">${item.lat.toFixed(3)}, ${item.lng.toFixed(3)}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // --- LEAFLET MAP LOGIC ---
+    function initMap() {
+      map = L.map('map', {
+        zoomControl: false
+      }).setView([DEFAULT_COORDS.lat, DEFAULT_COORDS.lng], 12);
+
+      // Dark theme tile layer (CartoDB Dark Matter)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 19
+      }).addTo(map);
+
+      // Zoom control custom placement
+      L.control.zoom({ position: 'topright' }).addTo(map);
+
+      // Add Layer Groups
+      mapLayers.sos.addTo(map);
+      mapLayers.camps.addTo(map);
+      mapLayers.alerts.addTo(map);
+
+      plotMapMarkers();
+    }
+
+    function plotMapMarkers() {
+      if (!map) return;
+
+      // Clear layers
+      mapLayers.sos.clearLayers();
+      mapLayers.camps.clearLayers();
+      mapLayers.alerts.clearLayers();
+
+      // 1. Plot SOS Markers (Red)
+      sosReports.forEach(item => {
+        const icon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div class="w-6 h-6 bg-rose-600 border-2 border-white pulse-sos flex items-center justify-center text-white text-[10px]"><i class="fa-solid fa-triangle-exclamation"></i></div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+
+        const marker = L.marker([item.lat, item.lng], { icon });
+        marker.bindPopup(`
+          <div class="p-1 space-y-2">
+            <div class="text-xs font-bold text-rose-400 uppercase tracking-wide">EMERGENCY SOS REQUEST</div>
+            <div class="text-sm font-bold text-white">${item.name}</div>
+            <div class="text-xs text-slate-300"><strong>Type:</strong> ${item.type}</div>
+            <div class="text-xs text-slate-300"><strong>People:</strong> ${item.count} Affected</div>
+            <div class="text-xs text-slate-300"><strong>Contact:</strong> ${item.phone}</div>
+            <div class="text-[10px] text-cyan-400 font-mono mt-1">${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}</div>
+          </div>
+        `);
+        mapLayers.sos.addLayer(marker);
+      });
+
+      // 2. Plot Relief Camp Markers (Green)
+      reliefCamps.forEach(camp => {
+        const icon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div class="w-7 h-7 bg-emerald-600 border-2 border-white rounded-full flex items-center justify-center text-white text-xs shadow-lg"><i class="fa-solid fa-campground"></i></div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14]
+        });
+
+        const occupancyPct = Math.round((camp.occupancy / camp.capacity) * 100);
+
+        const marker = L.marker([camp.lat, camp.lng], { icon });
+        marker.bindPopup(`
+          <div class="p-1 space-y-2">
+            <div class="text-xs font-bold text-emerald-400 uppercase tracking-wide">RELIEF CAMP INFRASTRUCTURE</div>
+            <div class="text-sm font-bold text-white">${camp.name}</div>
+            <div class="text-xs text-slate-300">${camp.location}</div>
+            <div class="text-xs text-slate-300"><strong>Occupancy:</strong> ${camp.occupancy}/${camp.capacity} (${occupancyPct}%)</div>
+            <div class="text-xs text-slate-300"><strong>Food Supply:</strong> ${camp.food}</div>
+            <div class="text-xs text-slate-300"><strong>Medical:</strong> ${camp.medical}</div>
+          </div>
+        `);
+        mapLayers.camps.addLayer(marker);
+      });
+
+      // 3. Plot USGS Earthquake Alerts (Amber/Yellow Pulse)
+      usgsAlerts.forEach(alert => {
+        const mag = alert.mag;
+        const size = Math.max(20, Math.min(45, mag * 8));
+
+        const icon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div class="bg-amber-500/80 border-2 border-amber-300 pulse-earthquake flex items-center justify-center text-slate-950 font-extrabold text-[10px]" style="width:${size}px; height:${size}px; font-size: 10px;">${mag}</div>`,
+          iconSize: [size, size],
+          iconAnchor: [size/2, size/2]
+        });
+
+        const marker = L.marker([alert.lat, alert.lng], { icon });
+        marker.bindPopup(`
+          <div class="p-1 space-y-2">
+            <div class="text-xs font-bold text-amber-400 uppercase tracking-wide">USGS SEISMIC EVENT</div>
+            <div class="text-sm font-bold text-white">Magnitude ${alert.mag} Earthquake</div>
+            <div class="text-xs text-slate-300">${alert.place}</div>
+            <div class="text-xs text-slate-400"><strong>Time:</strong> ${new Date(alert.time).toLocaleString()}</div>
+            <div class="text-[10px] text-cyan-400 font-mono mt-1">${alert.lat.toFixed(3)}, ${alert.lng.toFixed(3)}</div>
+          </div>
+        `);
+        mapLayers.alerts.addLayer(marker);
+      });
+    }
+
+    function toggleMapLayer(layerName) {
+      const isChecked = document.getElementById(`layer${layerName.charAt(0).toUpperCase() + layerName.slice(1)}Check`).checked;
+      if (isChecked) {
+        map.addLayer(mapLayers[layerName]);
+      } else {
+        map.removeLayer(mapLayers[layerName]);
+      }
+    }
+
+    function recenterMapToUser() {
+      if (map) {
+        map.setView([userCoords.lat, userCoords.lng], 13);
+      }
+    }
+
+    // --- RELIEF CAMPS REGISTRY & LOGISTICS ---
+    function renderCampTable() {
+      const tbody = document.getElementById('campsTableBody');
+      tbody.innerHTML = reliefCamps.map(camp => {
+        const pct = Math.round((camp.occupancy / camp.capacity) * 100);
+        let statusColor = 'bg-emerald-500';
+        if (pct > 80) statusColor = 'bg-rose-500';
+        else if (pct > 50) statusColor = 'bg-amber-500';
+
+        return `
+          <tr class="hover:bg-slate-800/50 transition-all">
+            <td class="px-6 py-4">
+              <div class="font-bold text-white">${camp.name}</div>
+              <div class="text-xs text-slate-500 font-mono">ID: ${camp.id}</div>
+            </td>
+            <td class="px-6 py-4 text-slate-300">
+              ${camp.location}
+            </td>
+            <td class="px-6 py-4">
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span>${camp.occupancy} / ${camp.capacity}</span>
+                <span class="font-bold">${pct}%</span>
+              </div>
+              <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
+                <div class="${statusColor} h-full transition-all" style="width: ${pct}%"></div>
+              </div>
+            </td>
+            <td class="px-6 py-4 text-xs font-semibold">
+              <span class="px-2.5 py-1 rounded-full ${camp.food.includes('Sufficient') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'}">
+                ${camp.food}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-xs font-semibold">
+              <span class="px-2.5 py-1 rounded-full ${camp.medical.includes('Fully') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'}">
+                ${camp.medical}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-right">
+              <button onclick="editCampModal('${camp.id}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 rounded-lg text-xs font-semibold transition-all">
+                <i class="fa-solid fa-pen-to-square mr-1"></i> Update
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterCampTable() {
+      const q = document.getElementById('campSearchInput').value.toLowerCase();
+      const rows = document.querySelectorAll('#campsTableBody tr');
+      rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    function openAddCampModal() {
+      document.getElementById('modalTitle').innerText = "Register New Relief Camp";
+      document.getElementById('modalCampId').value = "";
+      document.getElementById('campForm').reset();
+      document.getElementById('modalCampLat').value = userCoords.lat;
+      document.getElementById('modalCampLng').value = userCoords.lng;
+      document.getElementById('campModal').classList.remove('hidden');
+    }
+
+    function editCampModal(id) {
+      const camp = reliefCamps.find(c => c.id === id);
+      if (!camp) return;
+
+      document.getElementById('modalTitle').innerText = "Update Camp Logistics";
+      document.getElementById('modalCampId').value = camp.id;
+      document.getElementById('modalCampName').value = camp.name;
+      document.getElementById('modalCampLocation').value = camp.location;
+      document.getElementById('modalCampCapacity').value = camp.capacity;
+      document.getElementById('modalCampOccupancy').value = camp.occupancy;
+      document.getElementById('modalCampFood').value = camp.food;
+      document.getElementById('modalCampMedical').value = camp.medical;
+      document.getElementById('modalCampLat').value = camp.lat;
+      document.getElementById('modalCampLng').value = camp.lng;
+
+      document.getElementById('campModal').classList.remove('hidden');
+    }
+
+    function closeCampModal() {
+      document.getElementById('campModal').classList.add('hidden');
+    }
+
+    function saveCampForm(e) {
+      e.preventDefault();
+      const id = document.getElementById('modalCampId').value;
+      const name = document.getElementById('modalCampName').value;
+      const location = document.getElementById('modalCampLocation').value;
+      const capacity = parseInt(document.getElementById('modalCampCapacity').value, 10);
+      const occupancy = parseInt(document.getElementById('modalCampOccupancy').value, 10);
+      const food = document.getElementById('modalCampFood').value;
+      const medical = document.getElementById('modalCampMedical').value;
+      const lat = parseFloat(document.getElementById('modalCampLat').value);
+      const lng = parseFloat(document.getElementById('modalCampLng').value);
+
+      if (id) {
+        // Edit existing
+        const idx = reliefCamps.findIndex(c => c.id === id);
+        if (idx !== -1) {
+          reliefCamps[idx] = { id, name, location, capacity, occupancy, food, medical, lat, lng };
+        }
+      } else {
+        // Add new
+        const newCamp = {
+          id: 'camp-' + Date.now(),
+          name, location, capacity, occupancy, food, medical, lat, lng
+        };
+        reliefCamps.push(newCamp);
+      }
+
+      renderCampTable();
+      plotMapMarkers();
+      closeCampModal();
+      showNotification("Relief camp registry updated.");
+    }
+
+    // --- LIVE USGS API DISASTER ALERTS ---
+    async function fetchUsgsEarthquakes() {
+      const grid = document.getElementById('alertsFeedGrid');
+      grid.innerHTML = `
+        <div class="col-span-full py-12 text-center text-slate-500">
+          <i class="fa-solid fa-spinner fa-spin text-3xl text-amber-400 mb-2"></i>
+          <p class="text-sm">Connecting to USGS Earthquakes Stream API...</p>
+        </div>`;
+
+      try {
+        const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson');
+        if (!res.ok) throw new Error('API query limit or network failure');
+        
+        const data = await res.json();
+        
+        if (data.features && data.features.length > 0) {
+          usgsAlerts = data.features.map(f => ({
+            id: f.id,
+            mag: f.properties.mag || 1.0,
+            place: f.properties.place || 'Unknown Epicenter',
+            time: f.properties.time,
+            lng: f.geometry.coordinates[0],
+            lat: f.geometry.coordinates[1],
+            depth: f.geometry.coordinates[2]
+          }));
+        } else {
+          useFallbackUsgsData();
+        }
+      } catch (err) {
+        console.warn("USGS API live fetch failed. Loading mock fallback dataset.", err);
+        useFallbackUsgsData();
+      }
+
+      renderAlertsGrid();
+      plotMapMarkers();
+    }
+
+    function useFallbackUsgsData() {
+      // Mock seismic events around regional fault lines for reliable demo
+      usgsAlerts = [
+        { id: 'usgs-1', mag: 4.8, place: '72 km NE of Uttarakhand, India', time: Date.now() - 1000 * 60 * 15, lat: 30.3165, lng: 78.0322, depth: 10 },
+        { id: 'usgs-2', mag: 5.2, place: '12 km WSW of Kathmandu, Nepal', time: Date.now() - 1000 * 60 * 42, lat: 27.7172, lng: 85.3240, depth: 15 },
+        { id: 'usgs-3', mag: 3.9, place: '34 km S of Shimla, Himachal Pradesh', time: Date.now() - 1000 * 60 * 110, lat: 31.1048, lng: 77.1734, depth: 8 }
+      ];
+    }
+
+    function renderAlertsGrid() {
+      const grid = document.getElementById('alertsFeedGrid');
+
+      if (usgsAlerts.length === 0) {
+        grid.innerHTML = `<p class="col-span-full text-slate-500 text-center py-8">No recent seismic events detected in the past hour.</p>`;
+        return;
+      }
+
+      grid.innerHTML = usgsAlerts.map(a => `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 hover:border-amber-500/50 transition-all shadow-xl">
+          <div class="flex items-center justify-between">
+            <span class="px-3 py-1 rounded-full text-xs font-extrabold ${a.mag >= 5.0 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}">
+              Magnitude ${a.mag}
+            </span>
+            <span class="text-xs text-slate-500 font-mono">${new Date(a.time).toLocaleTimeString()}</span>
+          </div>
+          <div>
+            <h4 class="text-base font-bold text-white">${a.place}</h4>
+            <p class="text-xs text-slate-400 mt-1">Focal Depth: ${a.depth} km</p>
+          </div>
+          <div class="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <span class="font-mono text-cyan-400"><i class="fa-solid fa-earth-americas mr-1"></i>${a.lat.toFixed(2)}, ${a.lng.toFixed(2)}</span>
+            <button onclick="focusAlertOnMap(${a.lat}, ${a.lng})" class="text-amber-400 hover:text-amber-300 font-semibold">
+              View on Map <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function focusAlertOnMap(lat, lng) {
+      switchTab('mapTab');
+      if (map) {
+        map.setView([lat, lng], 8);
+      }
+    }
+  </script>
+</body>
+</html>

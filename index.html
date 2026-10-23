@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07131d" />
+    <meta name="description" content="DisplaceOS disaster relief coordination demonstration command center." />
+    <title>DisplaceOS | Crisis Command</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="#dashboard" data-page="dashboard" aria-label="DisplaceOS command center">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <span><strong>DISPLACE<span>OS</span></strong><small>CRISIS COMMAND</small></span>
+        </a>
+        <div class="workspace-label">WORKSPACE <span>DEMO 01</span></div>
+        <nav class="nav-list">
+          <button class="nav-item active" data-page="dashboard" title="Command center" aria-label="Command center"><span class="nav-icon">⌂</span>Command center</button>
+          <button class="nav-item" data-page="incidents" title="Incidents" aria-label="Incidents"><span class="nav-icon">⌖</span>Incidents <b id="incidentNavCount">0</b></button>
+          <button class="nav-item" data-page="map" title="Situation map" aria-label="Situation map"><span class="nav-icon">⊙</span>Situation map</button>
+          <button class="nav-item" data-page="camps" title="Relief camps" aria-label="Relief camps"><span class="nav-icon">⌂</span>Relief camps</button>
+          <button class="nav-item" data-page="teams" title="Response teams" aria-label="Response teams"><span class="nav-icon">◈</span>Response teams</button>
+          <button class="nav-item" data-page="resources" title="Resources" aria-label="Resources"><span class="nav-icon">▤</span>Resources</button>
+          <button class="nav-item" data-page="analytics" title="Analytics" aria-label="Analytics"><span class="nav-icon">▥</span>Analytics</button>
+          <button class="nav-item" data-page="alerts" title="Alert center" aria-label="Alert center"><span class="nav-icon">♧</span>Alert center <b class="alert-count" id="alertNavCount">0</b></button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="connection-row"><span class="pulse-dot"></span><span>LOCAL DEMO MODE</span></div>
+          <div class="user-box"><div class="avatar">OC</div><div><strong>Operations Desk</strong><small>DEMO ACCESS</small></div><span class="user-chevron">⌄</span></div>
+          <p class="sidebar-foot">DISPLACEOS <span>v0.1 DEMO</span></p>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div class="breadcrumb"><span>OPERATIONS</span><b>/</b><strong id="pageCrumb">COMMAND CENTER</strong></div>
+          <div class="top-actions">
+            <label class="role-control"><span>VIEW AS</span><select id="roleSelect" aria-label="Demo role"><option>Administrator</option><option>Responder</option><option>Camp manager</option><option>Volunteer</option></select></label>
+            <button class="icon-button alert-shortcut" data-page="alerts" aria-label="Open alerts" title="Open alert center">♧<i id="topAlertDot"></i></button>
+            <div class="top-time"><span class="pulse-dot"></span><span id="clock">--:--:--</span><small>DEMO CLOCK</small></div>
+          </div>
+        </header>
+        <section id="view" class="view" aria-live="polite"></section>
+        <footer class="app-footer"><span>DISPLACEOS COORDINATION SYSTEM</span><span>DEMONSTRATION DATA · NOT CONNECTED TO LIVE EMERGENCY SERVICES</span></footer>
+      </main>
+    </div>
+
+    <div id="dialog" class="dialog-backdrop" hidden>
+      <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+        <header class="dialog-head"><div><span class="eyebrow" id="dialogKicker">INCIDENT MANAGEMENT</span><h2 id="dialogTitle">New incident</h2></div><button class="icon-button" data-action="close-dialog" aria-label="Close dialog">×</button></header>
+        <div id="dialogBody"></div>
+      </section>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="app.js" defer></script>
+  </body>
+</html>
